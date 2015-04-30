@@ -5,46 +5,87 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.mxpnl.com/libs/mixpanel-platform/css/reset.css">
     <link rel="stylesheet" type="text/css" href="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.css">
     <script src="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.js"></script>
+    <style type="text/css">
+      .graphLabel {
+        display: none;
+        font-size: 18px;
+        color: rgb(95,105,131);
+      }
+    </style>
   </head>
   <body class="mixpanel-platform-body">
     <div class="mixpanel-platform-section">
-      <div id="eventSelect" style="float: left;"></div>
-      <div id="by" class="mixpanel-platform-label" style="margin-left: 10px; display: none;">by</div>
-      <div id="propSelect" style="float: left;"></div>
       <div id="dateSelect" style="float: right;"></div>
+      <div id="intervalSelect" style="float: right"></div>
+      <div id="typeSelect" style="float: right; margin-right: 15px"></div>
       <div style="clear: both;"></div>
-      <div id="graph"></div>
+      <p class="graphLabel">Week</p>
+      <div id="weekGraph"></div>
+      <p class="graphLabel">Month</p>
+      <div id="monthGraph"></div>
+      <p class="graphLabel">Three Months</p>
+      <div id="threeMonthGraph"></div>
     </div>
-    <div id="table"></div>
     <script>
-      var eventSelect = $('#eventSelect').MPEventSelect();
-      var propSelect  = $('#propSelect').MPPropertySelect();
-      var dateSelect  = $('#dateSelect').MPDatepicker();
-      var eventGraph  = $('#graph').MPChart({chartType: 'line'});
-      var eventTable  = $('#table').MPTable({
-        showPercentages: true,
-        firstColHeader: 'Event'
-      });
+      var dateSelect  = $('#dateSelect').MPDatepicker(),
+          options = {
+            items: [
+              {label: 'Total', value: 'general'},
+              {label: 'Unique', value: 'unique'},
+              {label: 'Average', value: 'average'}
+              ]
+          },
+          options2 = {
+            items: [
+              {label: 'Hour', value: 'hour'},
+              {label: 'Day', value: 'day'},
+              {label: 'Week', value: 'week'},
+              {label: 'Month', value: 'month'}
+              ]
+          },
+          typeSelect = $('#typeSelect').MPSelect(options),
+          intervalSelect = $('#intervalSelect').MPSelect(options2),
+          weekGraph  = $('#weekGraph').MPChart({chartType: 'line'}),
+          monthGraph = $('#monthGraph').MPChart({chartType: 'line'}),
+          threeMonthGraph = $('#threeMonthGraph').MPChart({chartType: 'line'});
+          
+      // set default interval to daily
+      $('#intervalSelect').val('day');
 
-      var runQuery = function() {
-        var eventName = eventSelect.MPEventSelect('value'),
-            propName  = propSelect.MPPropertySelect('value'),
-            dateRange = dateSelect.MPDatepicker('value');
 
-        if (eventName) {
-          MP.api.segment(eventName, propName, dateRange).done(function(results) {
-            eventGraph.MPChart('setData', results);
-            eventTable.MPTable('setData', results);
+      function runQuery() {
+        var dateRange = dateSelect.MPDatepicker('value'),
+            typeName  = typeSelect.MPSelect('value'),
+            intervalType = intervalSelect.MPSelect('value'),
+            graphs = [weekGraph, monthGraph, threeMonthGraph];
+            
+        $.each(graphs, function(i, graph) {
+          params = {
+            from: dateRange.from,
+            to: dateRange.to,
+            type: typeName,
+            unit: intervalType,
+          }
+          MP.api.segment('Invoice was cleared', params).done(function(results) {
+            graph.MPChart('setData', results).css('margin', '15px 0 30px');
+            $('.graphLabel').show();
           });
-        }
+          MP.api.segment('Login', params).done(function(results) {
+            graph.MPChart('addSeries', results);
+          });
+        });
       };
-      eventSelect.on('change', function(e, eventName) {
-        propSelect.MPPropertySelect('setEvent', eventName);
-        $("#by").show();
+
+      dateSelect.on('change', function() {
         runQuery();
       });
-      propSelect.on('change', runQuery);
-      dateSelect.on('change', runQuery);
+      typeSelect.on('change', function() {
+        runQuery();
+      });
+      intervalSelect.on('change', function() {
+        runQuery();
+      });
+      
     </script>
   </body>
 </html>
