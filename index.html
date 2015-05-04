@@ -6,6 +6,10 @@
     <link rel="stylesheet" type="text/css" href="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.css">
     <script src="https://cdn.mxpnl.com/libs/mixpanel-platform/build/mixpanel-platform.v0.latest.min.js"></script>
     <style type="text/css">
+      h1 {
+        font-size: 24px;
+        color: rgb(95,105,131);
+      }
       .graphLabel {
         display: none;
         font-size: 18px;
@@ -15,6 +19,7 @@
   </head>
   <body class="mixpanel-platform-body">
     <div class="mixpanel-platform-section">
+      <h1>Fundbox Dashbaord</h1>
       <div id="dateSelect" style="float: right;"></div>
       <div id="intervalSelect" style="float: right"></div>
       <div id="typeSelect" style="float: right; margin-right: 15px"></div>
@@ -27,63 +32,77 @@
       <div id="threeMonthGraph"></div>
     </div>
     <script>
-      var dateSelect  = $('#dateSelect').MPDatepicker(),
-          options = {
-            items: [
-              {label: 'Total', value: 'general'},
-              {label: 'Unique', value: 'unique'},
-              {label: 'Average', value: 'average'}
-              ]
-          },
-          options2 = {
-            items: [
-              {label: 'Hour', value: 'hour'},
-              {label: 'Day', value: 'day'},
-              {label: 'Week', value: 'week'},
-              {label: 'Month', value: 'month'}
-              ]
-          },
-          typeSelect = $('#typeSelect').MPSelect(options),
-          intervalSelect = $('#intervalSelect').MPSelect(options2),
-          weekGraph  = $('#weekGraph').MPChart({chartType: 'line'}),
-          monthGraph = $('#monthGraph').MPChart({chartType: 'line'}),
-          threeMonthGraph = $('#threeMonthGraph').MPChart({chartType: 'line'});
-          
-      // set default interval to daily
-      $('#intervalSelect').val('day');
-
-
-      function runQuery() {
-        var dateRange = dateSelect.MPDatepicker('value'),
-            typeName  = typeSelect.MPSelect('value'),
-            intervalType = intervalSelect.MPSelect('value'),
-            graphs = [weekGraph, monthGraph, threeMonthGraph];
+      MP.api.ready(function() {
+        // populate date picker and query type dropdown
+        var dateSelect  = $('#dateSelect').MPDatepicker(),
+            options = {
+              items: [
+                {label: 'Total', value: 'general'},
+                {label: 'Unique', value: 'unique'},
+                {label: 'Average', value: 'average'}
+                ]
+            },
+            typeSelect = $('#typeSelect').MPSelect(options),
             
-        $.each(graphs, function(i, graph) {
-          params = {
-            from: dateRange.from,
-            to: dateRange.to,
-            type: typeName,
-            unit: intervalType,
-          }
-          MP.api.segment('Invoice was cleared', params).done(function(results) {
-            graph.MPChart('setData', results).css('margin', '15px 0 30px');
-            $('.graphLabel').show();
-          });
-          MP.api.segment('Login', params).done(function(results) {
-            graph.MPChart('addSeries', results);
-          });
-        });
-      };
+            // set up graphs (to be populated later)
+            weekGraph = $('#weekGraph').MPChart({chartType: 'line'}),
+            monthGraph = $('#monthGraph').MPChart({chartType: 'line'}),
+            threeMonthGraph = $('#threeMonthGraph').MPChart({chartType: 'line'});
+            
+        // set default interval to daily
+        $('#intervalSelect').val('day');
+        // set default date range 
+        var today = new Date(),
+            sixMonths = new Date();
+        sixMonths.setMonth(today.getMonth() - 6);
+        dateSelect.val({from: sixMonths, to: today});
 
-      dateSelect.on('change', function() {
+        function runQuery(dates) {
+          var dateRange = dateSelect.MPDatepicker('value'),
+              typeName  = typeSelect.MPSelect('value');
+  
+          function mpSegment(interval, graph) {
+            if (dates) {
+              params = {
+                from: dateRange.from,
+                to: dateRange.to,
+                type: typeName,
+                unit: interval,
+              }
+            }
+            else {
+              params = {
+                from: moment().subtract(6, 'months'),
+                to: moment(),
+                type: typeName,
+                unit: interval,
+              }
+            }
+            MP.api.segment('Invoice was cleared', params).done(function(results) {
+              graph.MPChart('setData', results).css('margin', '15px 0 30px');
+              $('.graphLabel').show();
+            });
+            MP.api.segment('Login', params).done(function(results) {
+              graph.MPChart('addSeries', results);
+            });
+          }
+          
+          mpSegment('week', weekGraph);
+          mpSegment('month', monthGraph);
+          
+        };
+  
+        // run query when dropdowns change
+        dateSelect.on('change', function() {
+          runQuery('dates');
+        });
+        typeSelect.on('change', function() {
+          runQuery('dates');
+        });
+
+        // run query when report loads
         runQuery();
-      });
-      typeSelect.on('change', function() {
-        runQuery();
-      });
-      intervalSelect.on('change', function() {
-        runQuery();
+        
       });
       
     </script>
