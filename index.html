@@ -28,7 +28,7 @@
       <div id="weekGraph"></div>
       <p class="graphLabel">Monthly</p>
       <div id="monthGraph"></div>
-      <p class="graphLabel">Quarterly</p>
+      <p class="graphLabel">Every 3 Months</p>
       <div id="threeMonthGraph"></div>
     </div>
     <script>
@@ -50,16 +50,20 @@
           
       // set default interval to daily
       $('#intervalSelect').val('day');
-      // set default date range in date picker
+      
+      // set default date range in date picker (6 months)
       var today = new Date(),
           sixMonths = new Date();
       sixMonths.setMonth(today.getMonth() - 6);
       dateSelect.val({from: sixMonths, to: today});
 
       function runQuery(dates) {
+        
+        // grab values from dropdowns
         var dateRange = dateSelect.MPDatepicker('value'),
             typeName  = typeSelect.MPSelect('value');
 
+        // run a segmentation query based on inputs, summing data if necessary (for a 3 month interval)
         function mpSegment(interval, graph, sum) {
           if (dates) {
             // use date range from date picker
@@ -82,15 +86,62 @@
           if (sum) {
             // obtain data for 2 events and sum monthly results to get a quarterly result
             MP.api.segment('Invoice was cleared', params).done(function(results) {
-              graph.MPChart('setData', results).css('margin', '15px 0 30px');
+              var summedData = {};
+              $.each(results.values(), function(event, object) {
+                var dateCount = 0,
+                    currentDate,
+                    monthStarts = [];
+                summedData[event] = {};
+                // sort the months in the results object
+                $.each(object, function(date, value) {
+                  monthStarts.push(date);
+                  monthStarts.sort();
+                });
+                // add months to their respective quarters, starting from the first month
+                $.each(monthStarts, function(i, month) {
+                  dateCount ++;
+                  if ( dateCount % 3 == 1 ) {
+                    currentDate = month;
+                    summedData[event][month] = object[month];
+                  }
+                  else {
+                    summedData[event][currentDate] += object[month];
+                  }
+                });
+              });
+              // populate graph with first series
+              graph.MPChart('setData', summedData).css('margin', '15px 0 30px');
               $('.graphLabel').show();
             });
+            // same function as above for 'Login' event
             MP.api.segment('Login', params).done(function(results) {
-              graph.MPChart('addSeries', results);
+              var summedData = {};
+              $.each(results.values(), function(event, object) {
+                var dateCount = 0,
+                    currentDate,
+                    monthStarts = [];
+                summedData[event] = {};
+                $.each(object, function(date, value) {
+                  monthStarts.push(date);
+                  monthStarts.sort();
+                });
+                $.each(monthStarts, function(i, month) {
+                  dateCount ++;
+                  if ( dateCount % 3 == 1 ) {
+                    currentDate = month;
+                    summedData[event][month] = object[month];
+                  }
+                  else {
+                    summedData[event][currentDate] += object[month];
+                  }
+                });
+              });
+              // add second series to graph
+              graph.MPChart('addSeries', summedData2);
             });
           }
           else {
-            // obtain data for 2 events
+            // obtain data for 2 events (normal query)
             MP.api.segment('Invoice was cleared', params).done(function(results) {
               graph.MPChart('setData', results).css('margin', '15px 0 30px');
               $('.graphLabel').show();
